@@ -1,0 +1,77 @@
+/* print.css - Hide navigation, buttons, and restructure for A4 */
+@media print {
+    body {
+        background-color: white;
+        font-size: 10px;
+        /* Even smaller for print */
+        color: black;
+    }
+
+    .app-container {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    /* Hide UI elements */
+    .btn,
+    .no-print,
+    .action-column {
+        display: none !important;
+    }
+
+    .panel {
+        border: 1px solid #000;
+        box-shadow: none;
+        margin-bottom: 15px;
+        page-break-inside: avoid;
+    }
+
+    .panel-header {
+        background-color: #e5e5e5;
+        /* Light gray prints better */
+        border-bottom: 1px solid #000;
+        color: black;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .data-table {
+        border: 1px solid #000;
+    }
+
+    .data-table th,
+    .data-table td {
+        border: 1px solid #000;
+        padding: 4px;
+    }
+
+    .data-table th {
+        background-color: #e5e5e5;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Flatten inputs so they just look like text in print */
+    .form-input,
+    .form-select,
+    .form-textarea {
+        border: none;
+        background: transparent;
+        padding: 0;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        color: black;
+    }
+
+    /* Strip background from required fields for print */
+    .form-input[required],
+    .form-select[required] {
+        background-color: transparent;
+    }
+
+    .totals-row {
+        border-bottom: 1px solid #ccc;
+    }
+}

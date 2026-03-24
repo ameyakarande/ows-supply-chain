@@ -1,0 +1,287 @@
+/* CSS Variables for ERP-Style Layout */
+:root {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bg-color: #f5f6f8;
+  --text-primary: #333333;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  
+  --border-color: #d1d5db;
+  --border-light: #e5e7eb;
+  
+  --panel-bg: #ffffff;
+  --header-bg: #f9fafb;
+  --table-header-bg: #f3f4f6;
+  --highlight-bg: #e0f2fe; /* Light blue for focused rows/inputs */
+  
+  --primary-color: #0066cc;
+  --primary-hover: #0052a3;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --secondary-button: #6b7280;
+  
+  --input-bg: #ffffff;
+  --input-border: #cccccc;
+  --input-bg-required: #fdf6e3; /* Light yellow to signify required, similar to reference */
+  --input-focus: #3b82f6;
+
+  --rounded: 4px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 13px; /* Smaller font typical in ERPs */
+  line-height: 1.4;
+}
+
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Base Headings */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Utility Classes */
+.flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.align-center { align-items: center; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.w-full { width: 100%; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.text-danger { color: var(--danger-color); }
+.required-mark { color: var(--danger-color); margin-left: 2px; }
+
+/* Panels */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--rounded);
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 10px 15px;
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.panel-body {
+  padding: 15px;
+}
+
+/* Forms */
+.form-row {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.form-label {
+  flex: 0 0 160px; /* Fixed width for labels */
+  font-weight: 600;
+  padding-right: 10px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.form-value {
+  flex: 1;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  background-color: var(--input-bg);
+  height: 28px; /* Compact inputs */
+}
+
+.form-textarea {
+  height: auto;
+  min-height: 40px;
+  resize: vertical;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none;
+  border-color: var(--input-focus);
+}
+
+.form-input[required], .form-select[required] {
+  background-color: var(--input-bg-required);
+}
+
+.form-input:disabled, .form-select:disabled, .form-textarea:disabled {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.data-table th, .data-table td {
+  border: 1px solid var(--border-color);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.data-table th {
+  background-color: var(--table-header-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.data-table tr:nth-child(even) td {
+  background-color: var(--bg-color);
+}
+
+.data-table tr:hover td {
+  background-color: var(--highlight-bg);
+}
+
+/* Inputs specifically inside tables should be seamless if possible, or very compact */
+.data-table .form-input, .data-table .form-select {
+  border: 1px solid transparent;
+  width: 100%;
+  padding: 2px 4px;
+  height: 24px;
+}
+.data-table .form-input:focus, .data-table .form-select:focus {
+  border: 1px solid var(--input-focus);
+  background-color: #fff;
+}
+.data-table .form-input:hover, .data-table .form-select:hover {
+  border-color: var(--border-color);
+}
+.data-table .table-input-container {
+  background: white;
+  border: 1px solid var(--border-color);
+}
+.data-table .table-input-container input {
+  border: none;
+}
+
+/* Specific component styles */
+.quotation-header-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.totals-panel {
+  width: 300px;
+  margin-left: auto;
+}
+
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.totals-row:last-child {
+  border-bottom: none;
+  font-weight: bold;
+  font-size: 14px;
+  border-top: 2px solid var(--border-color);
+  padding-top: 10px;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge-new { background-color: #dbeafe; color: #1e40af; }
+.badge-draft { background-color: #fef3c7; color: #92400e; }
+.badge-submitted { background-color: #d1fae5; color: #065f46; }
+.badge-approved { background-color: #def7ec; color: #03543f; }
+.badge-po { background-color: #fce7f3; color: #9d174d; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--rounded);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+.btn-primary:hover { background-color: var(--primary-hover); }
+
+.btn-secondary {
+  background-color: white;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+.btn-secondary:hover { background-color: #f9fafb; border-color: #9ca3af; }
+
+.btn-danger {
+  background-color: var(--danger-color);
+  color: white;
+}
+.btn-danger:hover { background-color: #dc2626; }
+
+.btn-warning {
+  background-color: var(--warning-color);
+  color: white;
+}
+.btn-warning:hover { background-color: #d97706; }
+
+.btn-icon {
+  padding: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+}
+.btn-icon:hover { color: var(--primary-color); }
