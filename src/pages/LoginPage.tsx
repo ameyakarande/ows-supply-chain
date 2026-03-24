@@ -1,17 +1,57 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import ParticleFieldBackground from '../components/backgrounds/ParticleFieldBackground';
 import { LockKeyhole, UserRound } from 'lucide-react';
+import { checkSupabaseHealth, type SupabaseHealthStatus } from '../services/supabase';
 
 interface LoginPageProps {
     onLogin: () => void;
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
-    const { login } = useAuth();
+    const { login, isAuthLoading } = useAuth();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [healthStatus, setHealthStatus] = useState<SupabaseHealthStatus>('missing_config');
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const runHealthCheck = async () => {
+            const status = await checkSupabaseHealth();
+            if (isMounted) {
+                setHealthStatus(status);
+            }
+        };
+
+        void runHealthCheck();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const healthStyles: Record<SupabaseHealthStatus, { label: string; color: string; background: string; border: string }> = {
+        connected: {
+            label: 'Supabase connected',
+            color: '#bbf7d0',
+            background: 'rgba(20, 83, 45, 0.35)',
+            border: '1px solid rgba(74, 222, 128, 0.35)'
+        },
+        unavailable: {
+            label: 'Supabase unreachable',
+            color: '#fecaca',
+            background: 'rgba(127, 29, 29, 0.35)',
+            border: '1px solid rgba(248, 113, 113, 0.35)'
+        },
+        missing_config: {
+            label: 'Supabase config missing',
+            color: '#fde68a',
+            background: 'rgba(120, 53, 15, 0.35)',
+            border: '1px solid rgba(251, 191, 36, 0.35)'
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,6 +109,21 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     </div>
                     <div style={{ fontSize: '13px', color: 'rgba(226, 232, 240, 0.82)', marginTop: '6px', lineHeight: 1.5 }}>
                         Marine Procurement System
+                    </div>
+                    <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        marginTop: '14px',
+                        padding: '6px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.03em',
+                        color: healthStyles[healthStatus].color,
+                        background: healthStyles[healthStatus].background,
+                        border: healthStyles[healthStatus].border
+                    }}>
+                        {healthStyles[healthStatus].label}
                     </div>
                 </div>
 
@@ -157,6 +212,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
                     <button
                         type="submit"
+                        disabled={isAuthLoading}
                         style={{
                             width: '100%',
                             padding: '13px 16px',
@@ -167,10 +223,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                             fontSize: '14px',
                             fontWeight: 700,
                             cursor: 'pointer',
-                            boxShadow: '0 16px 36px rgba(37, 99, 235, 0.28)'
+                            boxShadow: '0 16px 36px rgba(37, 99, 235, 0.28)',
+                            opacity: isAuthLoading ? 0.7 : 1
                         }}
                     >
-                        Sign In
+                        {isAuthLoading ? 'Connecting to Supabase...' : 'Sign In'}
                     </button>
                 </form>
 

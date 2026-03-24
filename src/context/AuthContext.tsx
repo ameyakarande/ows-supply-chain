@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { initialMasterData } from '../data/mockData';
+import { appDataService } from '../services/appData';
+import { isSupabaseConfigured } from '../services/supabase';
 
 import { Attachment } from '../types';
 
@@ -36,6 +38,7 @@ interface AuthContextValue {
     logout: () => void;
     users: AppUser[];
     saveUsers: (users: AppUser[]) => void;
+    isAuthLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -58,6 +61,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return null;
         }
     });
+    const [isAuthLoading, setIsAuthLoading] = useState(isSupabaseConfigured);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const hydrateUsers = async () => {
+            if (!isSupabaseConfigured) {
+                setIsAuthLoading(false);
+                return;
+            }
+
+            const remoteUsers = await appDataService.loadUsers();
+
+            if (!isMounted) return;
+
+            if (remoteUsers && remoteUsers.length > 0) {
+                setUsers(remoteUsers);
+                localStorage.setItem('marine-users', JSON.stringify(remoteUsers));
+            } else {
+                await appDataService.saveUsers(users);
+            }
+
+            setIsAuthLoading(false);
+        };
+
+        void hydrateUsers();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const refreshedUser = users.find(user => user.id === currentUser.id) || users.find(user => user.username === currentUser.username);
+        if (!refreshedUser) return;
+
+        setCurrentUser(refreshedUser);
+        localStorage.setItem('marine-current-user', JSON.stringify(refreshedUser));
+    }, [users]);
 
     const login = (username: string, password: string): boolean => {
         const user = users.find(u => u.username === username && u.password === password);
@@ -77,10 +121,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const saveUsers = (updated: AppUser[]) => {
         setUsers(updated);
         localStorage.setItem('marine-users', JSON.stringify(updated));
+        void appDataService.saveUsers(updated);
     };
 
     return (
-        <AuthContext.Provider value={{ currentUser, login, logout, users, saveUsers }}>
+        <AuthContext.Provider value={{ currentUser, login, logout, users, saveUsers, isAuthLoading }}>
             {children}
         </AuthContext.Provider>
     );

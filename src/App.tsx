@@ -11,6 +11,8 @@ import InvoiceEntry from './pages/InvoiceEntry';
 import { Quotation, MasterData, Invoice } from './types';
 import InvoiceDashboard from './pages/InvoiceDashboard';
 import VendorDirectory from './pages/VendorDirectory';
+import { appDataService } from './services/appData';
+import { isSupabaseConfigured } from './services/supabase';
 
 type Page = 'list' | 'entry' | 'view' | 'admin' | 'compare' | 'invoice' | 'invoice-list' | 'vendors';
 
@@ -21,6 +23,7 @@ function AppInner() {
     const [selectedRfq, setSelectedRfq] = useState<string | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+    const [hasHydratedSupabaseData, setHasHydratedSupabaseData] = useState(!isSupabaseConfigured);
     const [masterData, setMasterData] = useState<MasterData>(() => {
         const saved = localStorage.getItem('marine-master-data');
         if (saved) {
@@ -99,6 +102,82 @@ function AppInner() {
     useEffect(() => {
         localStorage.setItem('marine-invoices', JSON.stringify(invoices));
     }, [invoices]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const hydrateSupabaseData = async () => {
+            if (!isSupabaseConfigured) {
+                setHasHydratedSupabaseData(true);
+                return;
+            }
+
+            const [remoteMasterData, remoteQuotations, remoteInvoices] = await Promise.all([
+                appDataService.loadMasterData(),
+                appDataService.loadQuotations(),
+                appDataService.loadInvoices()
+            ]);
+
+            if (!isMounted) return;
+
+            if (remoteMasterData) {
+                setMasterData(remoteMasterData);
+                localStorage.setItem('marine-master-data', JSON.stringify(remoteMasterData));
+            } else {
+                await appDataService.saveMasterData(masterData);
+            }
+
+            if (remoteQuotations && remoteQuotations.length > 0) {
+                setQuotations(remoteQuotations);
+
+                const slim = remoteQuotations.map(q => ({
+                    ...q,
+                    requisitionAttachments: [],
+                    quotationAttachments: []
+                }));
+                localStorage.setItem('marine-quotations', JSON.stringify(slim));
+
+                remoteQuotations.forEach(q => {
+                    localStorage.setItem(`marine-attachments-${q.id}`, JSON.stringify({
+                        reqAtts: q.requisitionAttachments ?? [],
+                        quoAtts: q.quotationAttachments ?? []
+                    }));
+                });
+            } else {
+                await appDataService.saveQuotations(quotations);
+            }
+
+            if (remoteInvoices) {
+                setInvoices(remoteInvoices);
+                localStorage.setItem('marine-invoices', JSON.stringify(remoteInvoices));
+            } else {
+                await appDataService.saveInvoices(invoices);
+            }
+
+            setHasHydratedSupabaseData(true);
+        };
+
+        void hydrateSupabaseData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!hasHydratedSupabaseData) return;
+        void appDataService.saveMasterData(masterData);
+    }, [masterData, hasHydratedSupabaseData]);
+
+    useEffect(() => {
+        if (!hasHydratedSupabaseData) return;
+        void appDataService.saveQuotations(quotations);
+    }, [quotations, hasHydratedSupabaseData]);
+
+    useEffect(() => {
+        if (!hasHydratedSupabaseData) return;
+        void appDataService.saveInvoices(invoices);
+    }, [invoices, hasHydratedSupabaseData]);
 
     const handleCreateNew = () => {
         setCurrentQuotationId(null);
