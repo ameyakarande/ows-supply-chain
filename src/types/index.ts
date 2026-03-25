@@ -140,6 +140,16 @@ export interface Invoice {
     poId?: string; // Origin PO ID if imported
 }
 
+export interface NotificationRecord {
+    id: string;
+    recipientEmail: string;
+    title: string;
+    message: string;
+    createdAt: string;
+    isRead: boolean;
+    relatedQuotationId?: string;
+}
+
 export interface Customer {
     id: string;
     name: string;

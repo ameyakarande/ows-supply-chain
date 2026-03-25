@@ -1,11 +1,12 @@
 import type { AppUser } from '../context/AuthContext';
-import type { Invoice, MasterData, Quotation } from '../types';
+import type { Invoice, MasterData, NotificationRecord, Quotation } from '../types';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 const USERS_TABLE = 'app_users';
 const MASTER_DATA_TABLE = 'app_master_data';
 const QUOTATIONS_TABLE = 'app_quotations';
 const INVOICES_TABLE = 'app_invoices';
+const NOTIFICATIONS_TABLE = 'app_notifications';
 const MASTER_DATA_ROW_ID = 'default';
 
 type PayloadRow<T> = {
@@ -118,5 +119,11 @@ export const appDataService = {
     },
     async saveInvoices(invoices: Invoice[]) {
         await syncCollection(INVOICES_TABLE, invoices);
+    },
+    async loadNotifications() {
+        return fetchCollection<NotificationRecord>(NOTIFICATIONS_TABLE);
+    },
+    async saveNotifications(notifications: NotificationRecord[]) {
+        await syncCollection(NOTIFICATIONS_TABLE, notifications);
     }
 };

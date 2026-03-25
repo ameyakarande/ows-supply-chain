@@ -8,11 +8,12 @@ import { QuotationComparison } from './pages/QuotationComparison';
 import { VendorProfileModal } from './components/common/VendorProfileModal';
 import { initialQuotations, initialMasterData } from './data/mockData';
 import InvoiceEntry from './pages/InvoiceEntry';
-import { Quotation, MasterData, Invoice } from './types';
+import { Quotation, MasterData, Invoice, NotificationRecord } from './types';
 import InvoiceDashboard from './pages/InvoiceDashboard';
 import VendorDirectory from './pages/VendorDirectory';
 import { appDataService } from './services/appData';
 import { isSupabaseConfigured } from './services/supabase';
+import { NotificationBell } from './components/common/NotificationBell';
 
 type Page = 'list' | 'entry' | 'view' | 'admin' | 'compare' | 'invoice' | 'invoice-list' | 'vendors';
 
@@ -23,6 +24,10 @@ function AppInner() {
     const [selectedRfq, setSelectedRfq] = useState<string | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+    const [notifications, setNotifications] = useState<NotificationRecord[]>(() => {
+        const saved = localStorage.getItem('marine-notifications');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [hasHydratedSupabaseData, setHasHydratedSupabaseData] = useState(!isSupabaseConfigured);
     const [masterData, setMasterData] = useState<MasterData>(() => {
         const saved = localStorage.getItem('marine-master-data');
@@ -104,6 +109,10 @@ function AppInner() {
     }, [invoices]);
 
     useEffect(() => {
+        localStorage.setItem('marine-notifications', JSON.stringify(notifications));
+    }, [notifications]);
+
+    useEffect(() => {
         let isMounted = true;
 
         const hydrateSupabaseData = async () => {
@@ -112,10 +121,11 @@ function AppInner() {
                 return;
             }
 
-            const [remoteMasterData, remoteQuotations, remoteInvoices] = await Promise.all([
+            const [remoteMasterData, remoteQuotations, remoteInvoices, remoteNotifications] = await Promise.all([
                 appDataService.loadMasterData(),
                 appDataService.loadQuotations(),
-                appDataService.loadInvoices()
+                appDataService.loadInvoices(),
+                appDataService.loadNotifications()
             ]);
 
             if (!isMounted) return;
@@ -154,6 +164,13 @@ function AppInner() {
                 await appDataService.saveInvoices(invoices);
             }
 
+            if (remoteNotifications) {
+                setNotifications(remoteNotifications);
+                localStorage.setItem('marine-notifications', JSON.stringify(remoteNotifications));
+            } else {
+                await appDataService.saveNotifications(notifications);
+            }
+
             setHasHydratedSupabaseData(true);
         };
 
@@ -178,6 +195,36 @@ function AppInner() {
         if (!hasHydratedSupabaseData) return;
         void appDataService.saveInvoices(invoices);
     }, [invoices, hasHydratedSupabaseData]);
+
+    useEffect(() => {
+        if (!hasHydratedSupabaseData) return;
+        void appDataService.saveNotifications(notifications);
+    }, [notifications, hasHydratedSupabaseData]);
+
+    const createNotification = (recipientEmail: string, title: string, message: string, relatedQuotationId?: string) => {
+        setNotifications(prev => [
+            {
+                id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                recipientEmail,
+                title,
+                message,
+                createdAt: new Date().toISOString(),
+                isRead: false,
+                relatedQuotationId
+            },
+            ...prev
+        ]);
+    };
+
+    const markCurrentUserNotificationsRead = () => {
+        if (!currentUser) return;
+
+        setNotifications(prev => prev.map(notification =>
+            notification.recipientEmail === currentUser.email
+                ? { ...notification, isRead: true }
+                : notification
+        ));
+    };
 
     const handleCreateNew = () => {
         setCurrentQuotationId(null);
@@ -206,6 +253,34 @@ function AppInner() {
     const handleSaveQuotation = (quotation: Quotation) => {
         setQuotations((prev) => {
             const existingIndex = prev.findIndex((q) => q.id === quotation.id);
+
+            if (existingIndex === -1 && currentUser?.role === 'company' && quotation.status === 'SentToVendor' && quotation.supplierEmail) {
+                createNotification(
+                    quotation.supplierEmail,
+                    'New quotation request',
+                    `You have a new quotation request for RFQ ${quotation.rfqNo}.`,
+                    quotation.id
+                );
+            }
+
+            if (
+                existingIndex >= 0 &&
+                currentUser?.role === 'vendor' &&
+                quotation.status === 'Submitted' &&
+                prev[existingIndex].status !== 'Submitted'
+            ) {
+                users
+                    .filter(user => user.role === 'company')
+                    .forEach(adminUser => {
+                        createNotification(
+                            adminUser.email,
+                            'Vendor submission received',
+                            `You have received a submission from ${currentUser?.displayName || 'a vendor'}.`,
+                            quotation.id
+                        );
+                    });
+            }
+
             if (existingIndex >= 0) {
                 const next = [...prev];
                 next[existingIndex] = quotation;
@@ -270,6 +345,10 @@ function AppInner() {
                             Profile
                         </button>
                     )}
+                    <NotificationBell
+                        notifications={notifications.filter(notification => notification.recipientEmail === currentUser.email)}
+                        onMarkAllRead={markCurrentUserNotificationsRead}
+                    />
                     {!isVendor && (
                         <button
                             onClick={() => {
@@ -376,7 +455,10 @@ function AppInner() {
                 {currentPage === 'vendors' && !isVendor && (
                     <VendorDirectory
                         users={users}
+                        masterData={masterData}
                         onBack={() => setCurrentPage('list')}
+                        onSaveUsers={saveUsers}
+                        onUpdateMasterData={setMasterData}
                     />
                 )}
                 {currentPage === 'list' && (

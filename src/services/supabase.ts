@@ -13,7 +13,7 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-export type SupabaseHealthStatus = 'connected' | 'unavailable' | 'missing_config';
+export type SupabaseHealthStatus = 'connected' | 'network_error' | 'schema_missing' | 'missing_config';
 
 export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
   if (!isSupabaseConfigured || !supabase) {
@@ -21,5 +21,21 @@ export async function checkSupabaseHealth(): Promise<SupabaseHealthStatus> {
   }
 
   const { error } = await supabase.from('app_master_data').select('id').limit(1);
-  return error ? 'unavailable' : 'connected';
+  if (!error) {
+    return 'connected';
+  }
+
+  const message = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase();
+  const code = `${error.code || ''}`.toLowerCase();
+
+  if (
+    code === '42p01' ||
+    message.includes('relation') ||
+    message.includes('does not exist') ||
+    message.includes('schema cache')
+  ) {
+    return 'schema_missing';
+  }
+
+  return 'network_error';
 }

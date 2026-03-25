@@ -4,6 +4,7 @@ import { VendorProfileModal } from '../components/common/VendorProfileModal';
 import { Edit, Trash2 } from 'lucide-react';
 
 import { Quotation, MasterData } from '../types';
+import { createVendorWithUserManagementLogic } from '../utils/vendorUtils';
 
 interface AdminPageProps {
     onBack: () => void;
@@ -36,42 +37,50 @@ export default function AdminPage({ onBack, quotations, masterData, onUpdateMast
     const [createdCredentials, setCreatedCredentials] = useState<{username: string, password: string} | null>(null);
 
     const handleAddUser = () => {
-        if (!newUsername.trim() || !newDisplayName.trim() || !newEmail.trim()) {
-            setAddError('All fields are required except password.');
-            return;
-        }
-        if (users.find(u => u.username === newUsername.trim())) {
-            setAddError('Username already exists.');
-            return;
-        }
+        if (newRole === 'vendor') {
+            const result = createVendorWithUserManagementLogic({
+                users,
+                masterData,
+                username: newUsername,
+                password: newPassword,
+                displayName: newDisplayName,
+                email: newEmail
+            });
 
-        let finalPassword = newPassword.trim();
-        if (!finalPassword) {
-            finalPassword = Math.random().toString(36).slice(-8); // Auto-generate securely enough
-        }
-
-        const newUser: AppUser = {
-            id: `u-${Date.now()}`,
-            username: newUsername.trim(),
-            password: finalPassword,
-            role: newRole,
-            displayName: newDisplayName.trim(),
-            email: newEmail.trim()
-        };
-        saveUsers([...users, newUser]);
-
-        // Sync with masterData if it's a vendor
-        if (newUser.role === 'vendor') {
-            const exists = masterData.suppliers.some(s => s.email === newUser.email);
-            if (!exists) {
-                onUpdateMasterData({
-                    ...masterData,
-                    suppliers: [...masterData.suppliers, { name: newUser.displayName, email: newUser.email }]
-                });
+            if ('error' in result) {
+                setAddError(result.error);
+                return;
             }
-        }
 
-        setCreatedCredentials({ username: newUser.username, password: finalPassword });
+            saveUsers([...users, result.user]);
+            onUpdateMasterData(result.masterData);
+            setCreatedCredentials(result.credentials);
+        } else {
+            if (!newUsername.trim() || !newDisplayName.trim() || !newEmail.trim()) {
+                setAddError('All fields are required except password.');
+                return;
+            }
+            if (users.find(u => u.username === newUsername.trim())) {
+                setAddError('Username already exists.');
+                return;
+            }
+
+            let finalPassword = newPassword.trim();
+            if (!finalPassword) {
+                finalPassword = Math.random().toString(36).slice(-8); // Auto-generate securely enough
+            }
+
+            const newUser: AppUser = {
+                id: `u-${Date.now()}`,
+                username: newUsername.trim(),
+                password: finalPassword,
+                role: newRole,
+                displayName: newDisplayName.trim(),
+                email: newEmail.trim()
+            };
+        saveUsers([...users, newUser]);
+            setCreatedCredentials({ username: newUser.username, password: finalPassword });
+        }
         setNewUsername('');
         setNewPassword('');
         setNewDisplayName('');

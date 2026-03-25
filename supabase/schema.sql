@@ -24,6 +24,12 @@ create table if not exists public.app_invoices (
     updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.app_notifications (
+    id text primary key,
+    payload jsonb not null,
+    updated_at timestamptz not null default timezone('utc', now())
+);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -58,10 +64,17 @@ before update on public.app_invoices
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists app_notifications_set_updated_at on public.app_notifications;
+create trigger app_notifications_set_updated_at
+before update on public.app_notifications
+for each row
+execute function public.set_updated_at();
+
 alter table public.app_users enable row level security;
 alter table public.app_master_data enable row level security;
 alter table public.app_quotations enable row level security;
 alter table public.app_invoices enable row level security;
+alter table public.app_notifications enable row level security;
 
 drop policy if exists "Allow anon full access app_users" on public.app_users;
 create policy "Allow anon full access app_users"
@@ -90,6 +103,14 @@ with check (true);
 drop policy if exists "Allow anon full access app_invoices" on public.app_invoices;
 create policy "Allow anon full access app_invoices"
 on public.app_invoices
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "Allow anon full access app_notifications" on public.app_notifications;
+create policy "Allow anon full access app_notifications"
+on public.app_notifications
 for all
 to anon, authenticated
 using (true)

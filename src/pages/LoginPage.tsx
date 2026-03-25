@@ -39,17 +39,23 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             background: 'rgba(20, 83, 45, 0.35)',
             border: '1px solid rgba(74, 222, 128, 0.35)'
         },
-        unavailable: {
-            label: 'Supabase unreachable',
+        network_error: {
+            label: 'Supabase network error',
             color: '#fecaca',
             background: 'rgba(127, 29, 29, 0.35)',
             border: '1px solid rgba(248, 113, 113, 0.35)'
         },
-        missing_config: {
-            label: 'Supabase config missing',
+        schema_missing: {
+            label: 'Supabase schema missing',
             color: '#fde68a',
             background: 'rgba(120, 53, 15, 0.35)',
             border: '1px solid rgba(251, 191, 36, 0.35)'
+        },
+        missing_config: {
+            label: 'Supabase config missing',
+            color: '#fcd34d',
+            background: 'rgba(92, 45, 12, 0.35)',
+            border: '1px solid rgba(245, 158, 11, 0.35)'
         }
     };
 
