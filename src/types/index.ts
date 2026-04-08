@@ -165,6 +165,8 @@ export interface EmailSignature {
     websiteUrl?: string;
     tradeId?: string;
     environmentNote?: string;
+    logoUrl?: string;
+    logoWidth?: number;
     isDefault: boolean;
     ownerEmail: string;
     createdAt: string;

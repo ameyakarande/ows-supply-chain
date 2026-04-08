@@ -564,39 +564,7 @@ export default function VendorEmailPage({
         window.alert(`Email sent successfully to ${combinedRecipientEmails.length} recipient${combinedRecipientEmails.length === 1 ? '' : 's'}.`);
     };
 
-    const sendReminder = async (message: EmailMessageRecord) => {
-        if (!outlookSession) {
-            throw new Error('Connect Outlook before sending reminders.');
-        }
 
-        const reminderSentAt = new Date().toISOString();
-
-        for (const recipientEmail of message.toVendorEmails) {
-            await sendOutlookEmail({
-                subject: `Reminder: ${message.subject}`,
-                bodyHtml: `${toHtmlParagraphs(message.body)}<br /><br /><strong>This is a reminder email.</strong>`,
-                to: [recipientEmail],
-                cc: message.cc,
-                bcc: message.bcc,
-                attachments: message.attachments.filter(attachment => attachment.base64Data)
-            });
-        }
-
-        onSaveMessages([
-            {
-                ...message,
-                id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                subject: `Reminder: ${message.subject}`,
-                createdAt: reminderSentAt,
-                sentAt: reminderSentAt
-            },
-            ...messages
-        ]);
-
-        setStatusMessage(`Reminder sent to ${message.toVendorEmails.length} recipient${message.toVendorEmails.length === 1 ? '' : 's'}.`);
-        setErrorMessage('');
-        window.alert(`Reminder sent successfully to ${message.toVendorEmails.length} recipient${message.toVendorEmails.length === 1 ? '' : 's'}.`);
-    };
 
     const deleteDraft = (draftId: string) => {
         if (!window.confirm('Delete this saved draft from the app?')) return;
