@@ -1,11 +1,30 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { MasterData } from '../types';
 import { AppUser } from '../context/AuthContext';
+import { 
+    Users, 
+    Search, 
+    ArrowLeft, 
+    Mail, 
+    Phone, 
+    Send, 
+    ChevronLeft, 
+    ChevronRight, 
+    MapPin,
+    Building2,
+    Copy,
+    ListFilter,
+    UserPlus,
+    Edit,
+    LayoutGrid,
+    List,
+    Trash2,
+    CheckSquare,
+    Square
+} from 'lucide-react';
 import { Button } from '../components/common/Button';
-import { ArrowLeft, Building2, ChevronLeft, ChevronRight, FileText, Globe2, ListFilter, Mail, Pencil, Plus } from 'lucide-react';
 import { VendorProfileModal } from '../components/common/VendorProfileModal';
 import { Modal } from '../components/common/Modal';
-import { MasterData } from '../types';
-import { createVendorWithUserManagementLogic } from '../utils/vendorUtils';
 
 interface VendorDirectoryProps {
     users: AppUser[];
@@ -15,324 +34,521 @@ interface VendorDirectoryProps {
     onUpdateMasterData: (data: MasterData) => void;
 }
 
-type AlphabeticalOrder = 'A-Z' | 'Z-A';
-
-const CARDS_PER_PAGE = 30;
-
-export default function VendorDirectory({
-    users,
-    masterData,
-    onBack,
-    onSaveUsers,
-    onUpdateMasterData
-}: VendorDirectoryProps) {
-    const [categoryFilter, setCategoryFilter] = useState('All');
-    const [countryFilter, setCountryFilter] = useState('All');
-    const [alphabeticalOrder, setAlphabeticalOrder] = useState<AlphabeticalOrder>('A-Z');
+export default function VendorDirectory({ users, masterData, onBack, onSaveUsers, onUpdateMasterData }: VendorDirectoryProps) {
+    const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [copySuccess, setCopySuccess] = useState(false);
     const [editingVendor, setEditingVendor] = useState<AppUser | null>(null);
-    const [isAddVendorModalOpen, setIsAddVendorModalOpen] = useState(false);
-    const [newUsername, setNewUsername] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [newDisplayName, setNewDisplayName] = useState('');
-    const [newEmail, setNewEmail] = useState('');
-    const [addError, setAddError] = useState('');
-    const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
+    const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteSource, setDeleteSource] = useState<'single' | 'bulk'>('bulk');
+    const [singleDeleteId, setSingleDeleteId] = useState<string | null>(null);
+    
+    const vendorsPerPage = 50;
 
-    const vendors = useMemo(
-        () => users.filter(user => user.role === 'vendor'),
-        [users]
-    );
-
-    const categoryOptions = useMemo(() => {
-        const categories = vendors.flatMap(vendor => vendor.categories || []);
-        return ['All', ...Array.from(new Set(categories)).sort((a, b) => a.localeCompare(b))];
-    }, [vendors]);
-
-    const countryOptions = useMemo(() => {
-        const countries = vendors.flatMap(vendor => vendor.countries || []);
-        return ['All', ...Array.from(new Set(countries)).sort((a, b) => a.localeCompare(b))];
-    }, [vendors]);
+    const vendors = useMemo(() => {
+        return users.filter(u => u.role === 'vendor');
+    }, [users]);
 
     const filteredVendors = useMemo(() => {
-        const next = vendors.filter(vendor => {
-            const matchesCategory = categoryFilter === 'All' || (vendor.categories || []).includes(categoryFilter);
-            const matchesCountry = countryFilter === 'All' || (vendor.countries || []).includes(countryFilter);
-            return matchesCategory && matchesCountry;
+        const query = searchTerm.toLowerCase();
+        return vendors.filter(v => 
+            v.displayName.toLowerCase().includes(query) ||
+            v.username.toLowerCase().includes(query) ||
+            v.email.toLowerCase().includes(query) ||
+            v.categories?.some(c => c.toLowerCase().includes(query)) ||
+            v.countries?.some(c => c.toLowerCase().includes(query))
+        );
+    }, [vendors, searchTerm]);
+
+    const totalPages = Math.ceil(filteredVendors.length / vendorsPerPage);
+    const paginatedVendors = filteredVendors.slice(
+        (currentPage - 1) * vendorsPerPage,
+        currentPage * vendorsPerPage
+    );
+
+    const copyRegistrationLink = () => {
+        const url = `${window.location.origin}${window.location.pathname}?page=register`;
+        navigator.clipboard.writeText(url);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+    };
+
+    const handleAddVendor = (newUser: AppUser) => {
+        const updatedUsers = [...users, newUser];
+        onSaveUsers(updatedUsers);
+
+        // Sync with masterData suppliers
+        if (!masterData.suppliers.some(s => s.email === newUser.email)) {
+            onUpdateMasterData({
+                ...masterData,
+                suppliers: [...masterData.suppliers, { name: newUser.displayName, email: newUser.email }]
+            });
+        }
+        setIsAddVendorOpen(false);
+    };
+
+    const handleUpdateVendor = (updated: AppUser) => {
+        const original = users.find(u => u.id === updated.id);
+        const updatedUsers = users.map(u => u.id === updated.id ? updated : u);
+        onSaveUsers(updatedUsers);
+
+        if (original && updated.role === 'vendor') {
+            onUpdateMasterData({
+                ...masterData,
+                suppliers: masterData.suppliers.map(s => 
+                    s.email === original.email ? { name: updated.displayName, email: updated.email } : s
+                )
+            });
+        }
+        setEditingVendor(null);
+    };
+
+    const handleToggleSelect = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedIds(paginatedVendors.map(v => v.id));
+        } else {
+            setSelectedIds([]);
+        }
+    };
+
+    const initiateSingleDelete = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSingleDeleteId(id);
+        setDeleteSource('single');
+        setIsDeleteModalOpen(true);
+    };
+
+    const initiateBulkDelete = () => {
+        setDeleteSource('bulk');
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = () => {
+        let idsToDelete: string[] = [];
+        if (deleteSource === 'single' && singleDeleteId) {
+            idsToDelete = [singleDeleteId];
+        } else if (deleteSource === 'bulk') {
+            idsToDelete = selectedIds;
+        }
+
+        if (idsToDelete.length === 0) return;
+
+        const emailsToDelete = users
+            .filter(u => idsToDelete.includes(u.id))
+            .map(u => u.email);
+
+        const updatedUsers = users.filter(u => !idsToDelete.includes(u.id));
+        onSaveUsers(updatedUsers);
+
+        // Update Master Data Suppliers
+        onUpdateMasterData({
+            ...masterData,
+            suppliers: masterData.suppliers.filter(s => !emailsToDelete.includes(s.email))
         });
 
-        next.sort((a, b) => {
-            const direction = alphabeticalOrder === 'A-Z' ? 1 : -1;
-            return a.displayName.localeCompare(b.displayName) * direction;
-        });
-
-        return next;
-    }, [vendors, categoryFilter, countryFilter, alphabeticalOrder]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredVendors.length / CARDS_PER_PAGE));
-    const paginatedVendors = filteredVendors.slice((currentPage - 1) * CARDS_PER_PAGE, currentPage * CARDS_PER_PAGE);
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [categoryFilter, countryFilter, alphabeticalOrder]);
-
-    useEffect(() => {
-        setCurrentPage(prev => Math.min(prev, totalPages));
-    }, [totalPages]);
-
-    const filterBoxStyle: React.CSSProperties = {
-        padding: '10px 12px',
-        border: '1px solid #dbe2f0',
-        borderRadius: '8px',
-        fontSize: '13px',
-        backgroundColor: '#fff',
-        minWidth: '190px'
+        setSelectedIds(prev => prev.filter(id => !idsToDelete.includes(id)));
+        setIsDeleteModalOpen(false);
+        setSingleDeleteId(null);
     };
 
     const infoPillStyle: React.CSSProperties = {
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '4px 8px',
+        padding: '3px 10px',
         borderRadius: '999px',
-        backgroundColor: '#eef2ff',
-        color: '#334155',
-        fontSize: '12px',
-        fontWeight: 600
-    };
-
-    const inputStyle: React.CSSProperties = {
-        padding: '9px 10px',
-        border: '1px solid #c7cfe4',
-        borderRadius: '6px',
-        fontSize: '13px',
-        width: '100%',
-        boxSizing: 'border-box'
-    };
-
-    const resetAddVendorForm = () => {
-        setNewUsername('');
-        setNewPassword('');
-        setNewDisplayName('');
-        setNewEmail('');
-        setAddError('');
-        setCreatedCredentials(null);
-    };
-
-    const handleAddVendor = () => {
-        const result = createVendorWithUserManagementLogic({
-            users,
-            masterData,
-            username: newUsername,
-            password: newPassword,
-            displayName: newDisplayName,
-            email: newEmail
-        });
-
-        if ('error' in result) {
-            setAddError(result.error);
-            return;
-        }
-
-        onSaveUsers([...users, result.user]);
-        onUpdateMasterData(result.masterData);
-        setCreatedCredentials(result.credentials);
-        setAddError('');
+        fontSize: '11px',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em'
     };
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #dbe2f0', paddingBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <Button variant="secondary" onClick={onBack}>
-                        <ArrowLeft size={16} style={{ marginRight: '6px' }} />
-                        Back
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
+            {/* Header section with refined search and stats */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <Button variant="secondary" onClick={onBack} style={{ padding: '8px' }}>
+                        <ArrowLeft size={18} />
                     </Button>
-                    <div style={{ padding: '10px', borderRadius: '12px', background: 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)', color: '#1d4ed8' }}>
-                        <Building2 size={22} />
-                    </div>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '22px', color: '#0f172a' }}>Vendor Directory</h2>
-                        <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>Admin-only directory of all registered vendors.</p>
+                        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Vendor Directory</h1>
+                        <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>Manage and browse registered maritime service providers</p>
                     </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ ...infoPillStyle, backgroundColor: '#dcfce7', color: '#166534' }}>
-                        {filteredVendors.length} Vendor{filteredVendors.length === 1 ? '' : 's'}
-                    </div>
-                    <Button variant="primary" onClick={() => setIsAddVendorModalOpen(true)}>
-                        <Plus size={16} style={{ marginRight: '6px' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Button 
+                        onClick={() => setIsAddVendorOpen(true)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#1e3a8a' }}
+                    >
+                        <UserPlus size={16} />
                         Add Vendor
                     </Button>
+                    <Button variant="secondary" onClick={copyRegistrationLink} style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #3b82f6', color: '#2563eb' }}>
+                        {copySuccess ? <ListFilter size={16} /> : <Copy size={16} />}
+                        {copySuccess ? "Copied!" : "Copy Reg. Link"}
+                    </Button>
+                    {selectedIds.length > 0 && (
+                        <Button 
+                            variant="danger" 
+                            onClick={initiateBulkDelete}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <Trash2 size={16} />
+                            Delete ({selectedIds.length})
+                        </Button>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: '10px', padding: '4px' }}>
+                        <button 
+                            onClick={() => setViewMode('grid')}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                padding: '6px 12px', 
+                                borderRadius: '7px', 
+                                border: 'none',
+                                backgroundColor: viewMode === 'grid' ? '#fff' : 'transparent',
+                                color: viewMode === 'grid' ? '#1e40af' : '#64748b',
+                                cursor: 'pointer',
+                                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('list')}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                padding: '6px 12px', 
+                                borderRadius: '7px', 
+                                border: 'none',
+                                backgroundColor: viewMode === 'list' ? '#fff' : 'transparent',
+                                color: viewMode === 'list' ? '#1e40af' : '#64748b',
+                                cursor: 'pointer',
+                                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <List size={16} />
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#eff6ff', color: '#1e40af', padding: '8px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: 600 }}>
+                        <Users size={18} />
+                        {vendors.length} Total Vendors
+                    </div>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '24px', padding: '16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontWeight: 600, fontSize: '13px', marginRight: '4px' }}>
-                    <ListFilter size={16} />
-                    Filters
+            {/* Enhanced search bar UI */}
+            <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.03)', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                <div style={{ position: 'relative' }}>
+                    <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                        type="text"
+                        placeholder="Search by vendor name, category, country or username..."
+                        value={searchTerm}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        style={{
+                            width: '100%',
+                            padding: '14px 14px 14px 48px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '12px',
+                            fontSize: '15px',
+                            backgroundColor: '#f8fafc',
+                            outline: 'none',
+                            transition: 'all 0.2s',
+                            boxSizing: 'border-box'
+                        }}
+                    />
                 </div>
-                <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={filterBoxStyle}>
-                    {categoryOptions.map(option => (
-                        <option key={option} value={option}>
-                            {option === 'All' ? 'All Categories' : option}
-                        </option>
-                    ))}
-                </select>
-                <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)} style={filterBoxStyle}>
-                    {countryOptions.map(option => (
-                        <option key={option} value={option}>
-                            {option === 'All' ? 'All Countries' : option}
-                        </option>
-                    ))}
-                </select>
-                <select value={alphabeticalOrder} onChange={e => setAlphabeticalOrder(e.target.value as AlphabeticalOrder)} style={filterBoxStyle}>
-                    <option value="A-Z">Alphabetical: A to Z</option>
-                    <option value="Z-A">Alphabetical: Z to A</option>
-                </select>
             </div>
 
-            {filteredVendors.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px 24px', border: '1px dashed #cbd5e1', borderRadius: '12px', backgroundColor: '#fff' }}>
-                    <h3 style={{ margin: '0 0 8px 0', color: '#0f172a' }}>No vendors match these filters</h3>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>Try a different category, country, or alphabetical sort.</p>
-                </div>
-            ) : (
-                <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                        {paginatedVendors.map(vendor => (
-                            <div key={vendor.id} style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.05)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '14px' }}>
-                                    <div>
-                                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '16px' }}>{vendor.displayName}</h3>
-                                        <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>{vendor.username}</div>
+            {/* Conditionally render Grid or List View */}
+            {viewMode === 'grid' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px', alignItems: 'stretch' }}>
+                    {paginatedVendors.map(vendor => (
+                        <div key={vendor.id} style={{ 
+                            backgroundColor: '#fff', 
+                            borderRadius: '20px', 
+                            border: '1px solid #e2e8f0', 
+                            padding: '24px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            height: '100%',
+                            position: 'relative',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                        }}>
+                            {/* Header Align Fix */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
+                                    <div 
+                                        onClick={(e) => handleToggleSelect(vendor.id, e)}
+                                        style={{ cursor: 'pointer', color: selectedIds.includes(vendor.id) ? '#2563eb' : '#cbd5e1', paddingTop: '4px' }}
+                                    >
+                                        {selectedIds.includes(vendor.id) ? <CheckSquare size={20} /> : <Square size={20} />}
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ ...infoPillStyle, backgroundColor: '#eff6ff', color: '#1d4ed8' }}>Vendor</span>
-                                        <Button variant="icon" onClick={() => setEditingVendor(vendor)} title="Edit Vendor" style={{ color: '#2563eb' }}>
-                                            <Pencil size={14} />
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '13px' }}>
-                                        <Mail size={14} color="#64748b" />
-                                        <span>{vendor.email}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '13px' }}>
-                                        <Globe2 size={14} color="#64748b" />
-                                        <span>{vendor.countries?.length ? vendor.countries.join(', ') : 'No countries added'}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155', fontSize: '13px' }}>
-                                        <FileText size={14} color="#64748b" />
-                                        <span>{vendor.documents?.length || 0} document{vendor.documents?.length === 1 ? '' : 's'}</span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {vendor.displayName}
+                                            </h3>
+                                            <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>Vendor</span>
+                                        </div>
+                                        <div style={{ color: '#64748b', fontSize: '12px', fontStyle: 'italic' }}>@{vendor.username}</div>
                                     </div>
                                 </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <Button 
+                                        variant="icon" 
+                                        onClick={() => setEditingVendor(vendor)}
+                                        style={{ backgroundColor: '#f8fafc', color: '#64748b', height: '32px', width: '32px', padding: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '1px solid #e2e8f0' }}
+                                    >
+                                        <Edit size={16} />
+                                    </Button>
+                                    <Button 
+                                        variant="icon" 
+                                        onClick={(e) => initiateSingleDelete(vendor.id, e)}
+                                        style={{ backgroundColor: '#fff1f2', color: '#e11d48', height: '32px', width: '32px', padding: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', border: '1px solid #fecdd3' }}
+                                    >
+                                        <Trash2 size={16} />
+                                    </Button>
+                                </div>
+                            </div>
 
-                                <div>
-                                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                        Categories
+                            {/* Contact details stack */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontSize: '13px' }}>
+                                    <div style={{ backgroundColor: '#f1f5f9', padding: '6px', borderRadius: '8px', display: 'flex' }}><Mail size={14} color="#64748b" /></div>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vendor.email}</span>
+                                </div>
+                                {vendor.whatsappNumber && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontSize: '13px' }}>
+                                        <div style={{ backgroundColor: '#f0fdf4', padding: '6px', borderRadius: '8px', display: 'flex' }}><Phone size={14} color="#16a34a" /></div>
+                                        <span>{vendor.whatsappNumber}</span>
                                     </div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                        {(vendor.categories?.length ? vendor.categories : ['Unassigned']).map(category => (
-                                            <span key={category} style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 9px', borderRadius: '999px', backgroundColor: category === 'Unassigned' ? '#f1f5f9' : '#fef3c7', color: category === 'Unassigned' ? '#64748b' : '#92400e', fontSize: '12px', fontWeight: 600 }}>
-                                                {category}
+                                )}
+                                {vendor.telegramUsername && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontSize: '13px' }}>
+                                        <div style={{ backgroundColor: '#eff6ff', padding: '6px', borderRadius: '8px', display: 'flex' }}><Send size={14} color="#2563eb" /></div>
+                                        <span>@{vendor.telegramUsername.replace(/^@/, '')}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Operating Countries Box */}
+                            {(vendor.countries && vendor.countries.length > 0) && (
+                                <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '12px', marginBottom: '20px', border: '1px solid #f1f5f9' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <MapPin size={10} /> Operating Countries
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '60px', overflowY: 'auto' }}>
+                                        {vendor.countries.map(country => (
+                                            <span key={country} style={{ fontSize: '11px', color: '#475569', backgroundColor: '#fff', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '6px' }}>
+                                                {country}
                                             </span>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '20px', padding: '12px 16px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '13px', color: '#64748b' }}>
-                            Showing {(currentPage - 1) * CARDS_PER_PAGE + 1}-
-                            {Math.min(currentPage * CARDS_PER_PAGE, filteredVendors.length)} of {filteredVendors.length}
+                            {/* Categories Box */}
+                            <div style={{ marginTop: 'auto' }}>
+                                <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Building2 size={10} /> Specialist Areas
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                    {vendor.categories && vendor.categories.length > 0 ? (
+                                        vendor.categories.map(cat => (
+                                            <span key={cat} style={{ ...infoPillStyle, backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                                                {cat}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span style={{ ...infoPillStyle, backgroundColor: '#f1f5f9', color: '#94a3b8' }}>General Supplier</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Button variant="secondary" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>
-                                <ChevronLeft size={14} style={{ marginRight: '6px' }} />
-                                Prev
-                            </Button>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                                Page {currentPage} of {totalPages}
-                            </span>
-                            <Button variant="secondary" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
-                                Next
-                                <ChevronRight size={14} style={{ marginLeft: '6px' }} />
-                            </Button>
-                        </div>
-                    </div>
-                </>
+                    ))}
+                </div>
+            ) : (
+                <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.03)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                            <tr>
+                                <th style={{ padding: '16px 24px', width: '40px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        onChange={handleSelectAll}
+                                        checked={paginatedVendors.length > 0 && selectedIds.length === paginatedVendors.length}
+                                    />
+                                </th>
+                                <th style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Vendor Name</th>
+                                <th style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Contact Info</th>
+                                <th style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Operating Countries</th>
+                                <th style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Specialist Areas</th>
+                                <th style={{ padding: '16px 24px', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedVendors.map(vendor => (
+                                <tr key={vendor.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s', backgroundColor: selectedIds.includes(vendor.id) ? '#f8fafc' : 'transparent' }}>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedIds.includes(vendor.id)}
+                                            onChange={() => handleToggleSelect(vendor.id)}
+                                        />
+                                    </td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{vendor.displayName}</div>
+                                        <div style={{ fontSize: '12px', color: '#64748b' }}>@{vendor.username}</div>
+                                    </td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155' }}>
+                                                <Mail size={12} color="#94a3b8" /> {vendor.email}
+                                            </div>
+                                            {vendor.whatsappNumber && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155' }}>
+                                                    <Phone size={12} color="#94a3b8" /> {vendor.whatsappNumber}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {vendor.countries?.slice(0, 3).map(c => (
+                                                <span key={c} style={{ fontSize: '11px', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{c}</span>
+                                            ))}
+                                            {(vendor.countries?.length || 0) > 3 && (
+                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>+{(vendor.countries?.length || 0) - 3} more</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {vendor.categories?.slice(0, 2).map(cat => (
+                                                <span key={cat} style={{ fontSize: '11px', backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>{cat}</span>
+                                            ))}
+                                            {(vendor.categories?.length || 0) > 2 && (
+                                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>+{(vendor.categories?.length || 0) - 2} more</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                            <Button 
+                                                variant="icon" 
+                                                onClick={() => setEditingVendor(vendor)}
+                                                style={{ backgroundColor: '#f8fafc', color: '#64748b', height: '32px', width: '32px', padding: 0, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', border: '1px solid #e2e8f0' }}
+                                            >
+                                                <Edit size={16} />
+                                            </Button>
+                                            <Button 
+                                                variant="icon" 
+                                                onClick={(e) => initiateSingleDelete(vendor.id, e)}
+                                                style={{ backgroundColor: '#fff1f2', color: '#e11d48', height: '32px', width: '32px', padding: 0, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', border: '1px solid #fecdd3' }}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
 
-            <Modal
-                isOpen={isAddVendorModalOpen}
-                onClose={() => {
-                    setIsAddVendorModalOpen(false);
-                    resetAddVendorForm();
-                }}
-                onConfirm={handleAddVendor}
-                title="Add New Vendor"
-                confirmText="Create Vendor"
-            >
-                <div style={{ display: 'grid', gap: '14px' }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>Display Name</label>
-                        <input style={inputStyle} value={newDisplayName} onChange={e => setNewDisplayName(e.target.value)} placeholder="e.g. Aqua Provisions" />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>Username</label>
-                        <input style={inputStyle} value={newUsername} onChange={e => { setNewUsername(e.target.value); setAddError(''); }} placeholder="e.g. vendor2" />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>Email Address</label>
-                        <input style={inputStyle} value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="e.g. vendor@example.com" />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '5px', color: '#334155' }}>Password (auto-generated if empty)</label>
-                        <input style={inputStyle} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Set or leave empty" />
-                    </div>
-                    {addError && <div style={{ color: '#dc2626', fontSize: '12px' }}>{addError}</div>}
-                    {createdCredentials && (
-                        <div style={{ backgroundColor: '#dcfce7', color: '#166534', padding: '10px', borderRadius: '8px', fontSize: '13px', border: '1px solid #bbf7d0' }}>
-                            <strong>Vendor created successfully.</strong><br />
-                            Username: {createdCredentials.username}<br />
-                            Password: {createdCredentials.password}
-                        </div>
-                    )}
+            {/* Standardized Pagination UI */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '32px' }}>
+                    <Button
+                        variant="secondary"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => prev - 1)}
+                        style={{ padding: '8px 12px' }}
+                    >
+                        <ChevronLeft size={16} />
+                    </Button>
+                    {[...Array(totalPages)].map((_, i) => (
+                        <Button
+                            key={i}
+                            variant={currentPage === i + 1 ? 'primary' : 'secondary'}
+                            onClick={() => setCurrentPage(i + 1)}
+                            style={{ padding: '8px 14px', borderRadius: '8px' }}
+                        >
+                            {i + 1}
+                        </Button>
+                    ))}
+                    <Button
+                        variant="secondary"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        style={{ padding: '8px 12px' }}
+                    >
+                        <ChevronRight size={16} />
+                    </Button>
                 </div>
-            </Modal>
+            )}
 
+            {/* Modals for Edit and Add Vendor */}
             {editingVendor && (
                 <VendorProfileModal
-                    isOpen={Boolean(editingVendor)}
+                    isOpen={!!editingVendor}
                     onClose={() => setEditingVendor(null)}
                     user={editingVendor}
-                    onSave={(updated) => {
-                        const original = users.find(user => user.id === updated.id);
-                        onSaveUsers(users.map(user => user.id === updated.id ? updated : user));
-
-                        if (original) {
-                            const supplierExists = masterData.suppliers.some(supplier => supplier.email === original.email);
-                            const updatedSuppliers = supplierExists
-                                ? masterData.suppliers.map(supplier =>
-                                    supplier.email === original.email
-                                        ? { name: updated.displayName, email: updated.email }
-                                        : supplier
-                                )
-                                : [...masterData.suppliers, { name: updated.displayName, email: updated.email }];
-
-                            onUpdateMasterData({
-                                ...masterData,
-                                suppliers: updatedSuppliers
-                            });
-                        }
-                    }}
+                    onSave={handleUpdateVendor}
                     isAdminView={true}
                 />
             )}
+
+            <VendorProfileModal
+                isOpen={isAddVendorOpen}
+                onClose={() => setIsAddVendorOpen(false)}
+                user={{}}
+                isCreateMode={true}
+                onSave={handleAddVendor}
+                isAdminView={true}
+            />
+
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => {
+                    setIsDeleteModalOpen(false);
+                    setSingleDeleteId(null);
+                }}
+                onConfirm={confirmDelete}
+                title={deleteSource === 'bulk' ? "Confirm Bulk Deletion" : "Confirm Vendor Deletion"}
+                confirmText="Delete"
+                confirmVariant="danger"
+            >
+                <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                    <div style={{ backgroundColor: '#fff1f2', color: '#e11d48', width: '60px', height: '60px', borderRadius: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                        <Trash2 size={30} />
+                    </div>
+                    <p style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>
+                        {deleteSource === 'bulk' 
+                            ? `Are you sure you want to delete ${selectedIds.length} vendors?` 
+                            : "Are you sure you want to delete this vendor?"
+                        }
+                    </p>
+                    <p style={{ color: '#64748b' }}>
+                        This action cannot be undone. Any master data association will also be removed.
+                    </p>
+                </div>
+            </Modal>
         </div>
     );
 }

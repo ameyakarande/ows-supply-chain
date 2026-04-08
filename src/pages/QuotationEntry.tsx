@@ -11,9 +11,10 @@ import { Button } from '../components/common/Button';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Printer, Copy, ArrowLeft, Send, Download, FileUp, FileText } from 'lucide-react';
 import { generatePO } from '../utils/poPdfUtils';
-import { sendVendorNotification } from '../utils/emailService';
+import { sendVendorMultiChannelNotification } from '../utils/vendorNotificationService';
 import { downloadTemplate, parseExcelFile, exportToExcel } from '../utils/excelUtils';
 import { MasterData } from '../types';
+import type { AppUser } from '../context/AuthContext';
 
 interface QuotationEntryProps {
     quotationId?: string | null; // null means new
@@ -21,8 +22,8 @@ interface QuotationEntryProps {
     isViewMode?: boolean;
     isVendor?: boolean;
     currentUserEmail?: string;
-    users?: any[]; // AppUser[]
-    saveUsers?: (users: any[]) => void;
+    users?: AppUser[];
+    saveUsers?: (users: AppUser[]) => void;
     masterData: MasterData;
     onUpdateMasterData: (data: MasterData) => void;
     onBack: () => void;
@@ -172,7 +173,7 @@ export default function QuotationEntry({
                     
                     // Automatically create a vendor user if saveUsers is available
                     if (saveUsers) {
-                        const newUser = {
+                        const newUser: AppUser = {
                             id: `u-vendor-${Date.now()}`,
                             username: trimmedEmail,
                             password: 'vendor123',
@@ -224,7 +225,7 @@ export default function QuotationEntry({
 
         if (isNew && !isVendor && selectedSuppliers.length > 0) {
             // Bulk create for multiple suppliers
-            selectedSuppliers.forEach((supplierName, index) => {
+            const dispatchTasks = selectedSuppliers.map(async (supplierName, index) => {
                 const supplierObj = masterData.suppliers.find(s => s.name === supplierName);
                 const supplierEmail = supplierObj?.email || '';
                 
@@ -238,9 +239,13 @@ export default function QuotationEntry({
                 };
 
                 onSave(newQuotation);
-                sendVendorNotification(newQuotation);
+                const vendorUser = users.find(user => user.role === 'vendor' && user.email === supplierEmail);
+                return sendVendorMultiChannelNotification(newQuotation, vendorUser);
             });
-            alert(`Quotation(s) created and notifications sent to ${selectedSuppliers.length} vendor(s).`);
+            const results = await Promise.all(dispatchTasks);
+            const whatsappCount = results.filter(result => result.whatsapp !== 'skipped').length;
+            const telegramCount = results.filter(result => result.telegram !== 'skipped').length;
+            alert(`Quotation(s) created. Email notifications were triggered for ${results.length} vendor(s), WhatsApp for ${whatsappCount}, and Telegram for ${telegramCount}.`);
             onBack();
         } else {
             // Single submission
@@ -254,8 +259,9 @@ export default function QuotationEntry({
             };
 
             if (!isVendor && nextStatus === 'SentToVendor') {
-                sendVendorNotification(updatedQuotation);
-                alert(`Notification email sent to vendor: ${data.supplier} (${data.supplierEmail})`);
+                const vendorUser = users.find(user => user.role === 'vendor' && user.email === updatedQuotation.supplierEmail);
+                const result = await sendVendorMultiChannelNotification(updatedQuotation, vendorUser);
+                alert(`Vendor notifications triggered. Email: ${result.email}. WhatsApp: ${result.whatsapp}. Telegram: ${result.telegram}.`);
             }
 
             onSave(updatedQuotation);

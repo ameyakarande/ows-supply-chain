@@ -21,6 +21,19 @@ Open the provided `http://localhost:3000` link in your browser to preview the ap
 
 * The app utilizes Vite for lightning-fast module replacement and uses standard React functionality.
 
+### 2a. Outlook Email Integration
+To enable the in-app Vendor Mail page with live Outlook sending, add these values to `.env.local`:
+```bash
+VITE_OUTLOOK_CLIENT_ID=your-azure-app-client-id
+VITE_OUTLOOK_TENANT_ID=common
+VITE_OUTLOOK_REDIRECT_PATH=/outlook-auth-callback.html
+```
+
+Your Azure App Registration should include:
+- A `Single-page application` redirect URI pointing to `http://localhost:3000/outlook-auth-callback.html`
+- Microsoft Graph delegated permissions for `User.Read`, `Mail.ReadWrite`, and `Mail.Send`
+- User consent for the selected tenant or the `common` tenant flow
+
 ### 3. Modifying Mock Data
 To test different scenarios or add your own items, simply edit `src/data/mockData.ts`. It contains all reference data arrays (suppliers, vessels, taxes) and an `initialQuotations` object.
 

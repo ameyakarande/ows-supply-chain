@@ -150,6 +150,80 @@ export interface NotificationRecord {
     relatedQuotationId?: string;
 }
 
+export interface EmailSignature {
+    id: string;
+    name: string;
+    content: string;
+    layout?: 'simple' | 'business-card';
+    signOff?: string;
+    senderName?: string;
+    companyName?: string;
+    addressLine?: string;
+    phonePrimary?: string;
+    phoneSecondary?: string;
+    emailAddress?: string;
+    websiteUrl?: string;
+    tradeId?: string;
+    environmentNote?: string;
+    isDefault: boolean;
+    ownerEmail: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface EmailTemplate {
+    id: string;
+    name: string;
+    subject: string;
+    body: string;
+    cc: string[];
+    bcc: string[];
+    signatureId?: string;
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface EmailDraft {
+    id: string;
+    name: string;
+    subject: string;
+    body: string;
+    toVendorEmails: string[];
+    cc: string[];
+    bcc: string[];
+    signatureId?: string;
+    attachments: Attachment[];
+    outlookDraftId?: string;
+    status: 'draft' | 'sent' | 'failed';
+    provider: 'local' | 'outlook-graph';
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
+    lastSyncedAt?: string;
+    lastSentAt?: string;
+    lastError?: string;
+}
+
+export interface EmailMessageRecord {
+    id: string;
+    draftId?: string;
+    subject: string;
+    body: string;
+    toVendorEmails: string[];
+    cc: string[];
+    bcc: string[];
+    signatureId?: string;
+    attachments: Attachment[];
+    status: 'draft' | 'sent' | 'failed';
+    provider: 'local' | 'outlook-graph';
+    createdBy: string;
+    createdAt: string;
+    sentAt?: string;
+    outlookMessageId?: string;
+    errorMessage?: string;
+}
+
 export interface Customer {
     id: string;
     name: string;

@@ -14,6 +14,11 @@ export interface AppUser {
     role: UserRole;
     displayName: string;
     email: string;
+    whatsappNumber?: string;
+    telegramUsername?: string;
+    telephoneNumber?: string;
+    mobileNumber?: string;
+    fullAddress?: string;
     categories?: string[];
     countries?: string[];
     documents?: Attachment[];

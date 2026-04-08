@@ -8,6 +8,8 @@ interface VendorCreationInput {
     password: string;
     displayName: string;
     email: string;
+    whatsappNumber?: string;
+    telegramUsername?: string;
 }
 
 interface VendorCreationSuccess {
@@ -29,7 +31,9 @@ export function createVendorWithUserManagementLogic({
     username,
     password,
     displayName,
-    email
+    email,
+    whatsappNumber,
+    telegramUsername
 }: VendorCreationInput): VendorCreationSuccess | VendorCreationError {
     if (!username.trim() || !displayName.trim() || !email.trim()) {
         return { error: 'All fields are required except password.' };
@@ -50,7 +54,9 @@ export function createVendorWithUserManagementLogic({
         password: finalPassword,
         role: 'vendor',
         displayName: displayName.trim(),
-        email: email.trim()
+        email: email.trim(),
+        whatsappNumber: whatsappNumber?.trim() || undefined,
+        telegramUsername: telegramUsername?.trim() || undefined
     };
 
     const supplierExists = masterData.suppliers.some(supplier => supplier.email === user.email);

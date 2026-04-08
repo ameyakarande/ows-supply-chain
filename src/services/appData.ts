@@ -1,5 +1,5 @@
 import type { AppUser } from '../context/AuthContext';
-import type { Invoice, MasterData, NotificationRecord, Quotation } from '../types';
+import type { EmailDraft, EmailMessageRecord, EmailSignature, EmailTemplate, Invoice, MasterData, NotificationRecord, Quotation } from '../types';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 const USERS_TABLE = 'app_users';
@@ -7,6 +7,10 @@ const MASTER_DATA_TABLE = 'app_master_data';
 const QUOTATIONS_TABLE = 'app_quotations';
 const INVOICES_TABLE = 'app_invoices';
 const NOTIFICATIONS_TABLE = 'app_notifications';
+const EMAIL_DRAFTS_TABLE = 'app_email_drafts';
+const EMAIL_SIGNATURES_TABLE = 'app_email_signatures';
+const EMAIL_MESSAGES_TABLE = 'app_email_messages';
+const EMAIL_TEMPLATES_TABLE = 'app_email_templates';
 const MASTER_DATA_ROW_ID = 'default';
 
 type PayloadRow<T> = {
@@ -125,5 +129,29 @@ export const appDataService = {
     },
     async saveNotifications(notifications: NotificationRecord[]) {
         await syncCollection(NOTIFICATIONS_TABLE, notifications);
+    },
+    async loadEmailDrafts() {
+        return fetchCollection<EmailDraft>(EMAIL_DRAFTS_TABLE);
+    },
+    async saveEmailDrafts(drafts: EmailDraft[]) {
+        await syncCollection(EMAIL_DRAFTS_TABLE, drafts);
+    },
+    async loadEmailSignatures() {
+        return fetchCollection<EmailSignature>(EMAIL_SIGNATURES_TABLE);
+    },
+    async saveEmailSignatures(signatures: EmailSignature[]) {
+        await syncCollection(EMAIL_SIGNATURES_TABLE, signatures);
+    },
+    async loadEmailMessages() {
+        return fetchCollection<EmailMessageRecord>(EMAIL_MESSAGES_TABLE);
+    },
+    async saveEmailMessages(messages: EmailMessageRecord[]) {
+        await syncCollection(EMAIL_MESSAGES_TABLE, messages);
+    },
+    async loadEmailTemplates() {
+        return fetchCollection<EmailTemplate>(EMAIL_TEMPLATES_TABLE);
+    },
+    async saveEmailTemplates(templates: EmailTemplate[]) {
+        await syncCollection(EMAIL_TEMPLATES_TABLE, templates);
     }
 };
